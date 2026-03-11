@@ -1,4 +1,4 @@
-# NestJS Event Sourcing Boilerplate
+# NestJS Event-Driven Architecture (EDA) Boilerplate
 
 Boilerplate completo para aplicações NestJS com arquitetura baseada em eventos (estilo **Event-Driven Architecture (EDA)**), utilizando **RabbitMQ** como Event Bus, suporte a filas (BullMQ), eventos internos (Event Emitter), autenticação JWT, Prisma ORM e muito mais.
 
