@@ -12,9 +12,15 @@ RUN yarn install
 
 COPY . .
 
+RUN npx prisma generate
+
 RUN yarn build
 
 RUN chmod +x infra/entrypoint.sh
+
+## Set permissions for PostgreSQL scripts
+RUN chmod +x infra/postgres/primary/init.sh
+RUN chmod +x infra/postgres/replica/setup-replica.sh
 
 ENV PATH=$PATH:/app/node_modules/.bin/
 

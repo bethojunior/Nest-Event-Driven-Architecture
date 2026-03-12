@@ -9,7 +9,7 @@ import { EventBusService } from './event-bus.service';
         name: 'EVENT_BUS',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://rabbitmq:5672'],
+          urls: ['amqp://RABBITMQ_DEFAULT_USER:RABBITMQ_DEFAULT_PASS@rabbitmq:5672'],
           queue: 'events',
           queueOptions: {
             durable: true,

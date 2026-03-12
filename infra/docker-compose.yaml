@@ -6,12 +6,19 @@ services:
     container_name: app
     restart: always
     depends_on:
-      - postgres
-      - redis
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports:
       - '3000:3000'
     environment:
-      DATABASE_URL: postgres://root:password@postgres:5432/mydatabase
+      DATABASE_WRITE_URL: postgresql://root:password@postgres-primary:5432/mydatabase
+      DATABASE_READ_URL: postgresql://root:password@postgres-replica:5432/mydatabase
       REDIS_HOST: redis
       REDIS_PORT: 6379
     volumes:
@@ -19,18 +26,9 @@ services:
     networks:
       - backend
 
-  redis:
-    image: redis/redis-stack-server:7.2.0-v10
-    container_name: redis
-    restart: always
-    ports:
-      - '6380:6379'
-    networks:
-      - backend
-
-  postgres:
-    image: postgres:16.2
-    container_name: postgres
+  postgres-primary:
+    image: postgres:16
+    container_name: postgres-primary
     restart: always
     ports:
       - '5432:5432'
@@ -39,27 +37,78 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: mydatabase
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./postgres/primary/init.sh:/docker-entrypoint-initdb.d/init.sh
     networks:
       - backend
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U root']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-replica:
+    image: postgres:16
+    container_name: postgres-replica
+    restart: always
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./postgres/replica/setup-replica.sh:/docker-entrypoint-initdb.d/setup-replica.sh
+    networks:
+      - backend
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U root -h localhost']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis/redis-stack-server:7.2.0-v10
+    container_name: redis
+    restart: always
+    ports:
+      - '6379:6379'
+    networks:
+      - backend
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
     restart: always
-    ports:
-      - '5672:5672'
-      - '15672:15672'
     environment:
       RABBITMQ_DEFAULT_USER: RABBITMQ_DEFAULT_USER
       RABBITMQ_DEFAULT_PASS: RABBITMQ_DEFAULT_PASS
+    ports:
+      - '5672:5672'
+      - '15672:15672'
     volumes:
-      - rabbitmq_data:/var/lib/rabbitm
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - backend
 
 volumes:
-  postgres_data:
+  postgres_primary_data:
+  postgres_replica_data:
+  redis_data:
   rabbitmq_data:
 
 networks:

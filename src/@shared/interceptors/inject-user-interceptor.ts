@@ -1,16 +1,16 @@
 import {
+  CallHandler,
+  ExecutionContext,
+  ForbiddenException,
   Injectable,
   NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  ForbiddenException,
 } from '@nestjs/common';
 import { Observable, from } from 'rxjs';
-import { PrismaProvider } from '../../providers/prisma/prisma.provider';
+import { PrismaWriteProvider } from 'src/providers/prisma/prisma-write.provider';
 
 @Injectable()
 export class InjectUserInterceptor implements NestInterceptor {
-  constructor(private readonly prisma: PrismaProvider) {}
+  constructor(private readonly prismaWriteProvider: PrismaWriteProvider) {}
 
   async intercept(
     context: ExecutionContext,
@@ -21,8 +21,10 @@ export class InjectUserInterceptor implements NestInterceptor {
 
     const routesPublicByPassInterptor = ['/auth/login', '/auth/register'];
 
-    const shouldBypass = routesPublicByPassInterptor.some(route => route === currentRoute);
-    if (shouldBypass) return next.handle()
+    const shouldBypass = routesPublicByPassInterptor.some(
+      (route) => route === currentRoute,
+    );
+    if (shouldBypass) return next.handle();
 
     const payload = request.user;
     if (!payload?.userId) {
@@ -31,16 +33,14 @@ export class InjectUserInterceptor implements NestInterceptor {
     }
 
     try {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.prismaWriteProvider.user.findUnique({
         where: { id: payload.userId },
       });
 
       if (!user.isActive) {
-        throw new ForbiddenException(
-          'Access denied. User blocked',
-        );
+        throw new ForbiddenException('Access denied. User blocked');
       }
-      
+
       request.userLogged = user;
       return from(next.handle());
     } catch (error) {
